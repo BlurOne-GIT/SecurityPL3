@@ -1,0 +1,8 @@
+name: SecurityPL3
+version: '${project.version}'
+main: code.blurone.securitypl3.SecurityPL3
+api-version: '1.20'
+load: STARTUP
+author: 'BlurOne!'
+website: 'https://github.com/BlurOne-GIT/SecurityPL3'
+description: 'Another minecraft authentication plugin (for the third time).'
