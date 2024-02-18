@@ -5,6 +5,8 @@ import org.bukkit.Bukkit
 import org.bukkit.NamespacedKey
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
+import org.bukkit.command.ConsoleCommandSender
+import org.bukkit.command.RemoteConsoleCommandSender
 import org.bukkit.command.TabExecutor
 import org.bukkit.entity.Player
 import org.bukkit.persistence.PersistentDataType
@@ -32,7 +34,7 @@ class ForceLogoutExecutor(private val authorizedNamespacedKey: NamespacedKey, pr
             sender.sendMessage("Player not found.")
             return true
         }
-        if (!operatorVersus && player.isOp)
+        if (sender !is ConsoleCommandSender && sender !is RemoteConsoleCommandSender && !operatorVersus && player.isOp)
         {
             sender.sendMessage("Player is an operator.")
             return true
