@@ -1,0 +1,12 @@
+password_attempts: 3
+
+# Uncomment the following lines to enable a custom location to send the unauthenticated players to.
+# The default location is the spawn point.
+
+# unauthenticated_location:
+#  world: world
+#  x: 0
+#  y: 64
+#  z: 0
+#  yaw: 0
+#  pitch: 0
