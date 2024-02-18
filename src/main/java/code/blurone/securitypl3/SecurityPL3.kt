@@ -1,5 +1,6 @@
 package code.blurone.securitypl3
 
+import code.blurone.securitypl3.commands.ForceLogoutExecutor
 import code.blurone.securitypl3.commands.LogoutExecutor
 import code.blurone.securitypl3.events.PlayerUnauthorizedEvent
 import com.google.common.hash.Hashing
@@ -28,6 +29,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
         // Plugin startup logic
         server.pluginManager.registerEvents(this, this)
         getCommand("logout")?.setExecutor(LogoutExecutor(authorizedNamespacedKey))
+        getCommand("forcelogout")?.setExecutor(ForceLogoutExecutor(authorizedNamespacedKey, config.getBoolean("op_vs_op", false)))
     }
 
     override fun onDisable() {
