@@ -1,4 +1,7 @@
+# Amount of attempts to login with the wrong password before the player is kicked.
 password_attempts: 3
+# Allow OPs to force other OPs to logout or change their password.
+op_vs_op: false
 
 # Uncomment the following lines to enable a custom location to send the unauthenticated players to.
 # The default location is the spawn point.
