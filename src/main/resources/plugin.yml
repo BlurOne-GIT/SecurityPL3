@@ -13,7 +13,11 @@ commands:
   changepassword:
     description: 'Change your password.'
     usage: '/changepassword'
-  resetpassword:
-    description: "Reset a player's password."
-    usage: '/resetpassword <player>'
-    permission: 'securitypl3.resetpassword'
+  forcelogout:
+    description: '(Admin) Force a player to logout.'
+    usage: '/forcelogout <player>'
+    permission: 'securitypl3.admin'
+  forcechangepassword:
+    description: '(Admin) Force a player to change their password.'
+    usage: '/forcechangepassword <player>'
+    permission: 'securitypl3.admin'
