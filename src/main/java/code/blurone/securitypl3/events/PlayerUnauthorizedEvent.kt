@@ -5,10 +5,12 @@ import org.bukkit.event.HandlerList
 import org.bukkit.event.player.PlayerEvent
 
 internal class PlayerUnauthorizedEvent(who: Player) : PlayerEvent(who) {
-    private val HANDLERS = HandlerList()
+    companion object {
+        @JvmStatic private val HANDLERS = HandlerList()
 
-    fun getHandlerList(): HandlerList {
-        return HANDLERS
+        @JvmStatic fun getHandlerList(): HandlerList {
+            return HANDLERS
+        }
     }
 
     override fun getHandlers(): HandlerList {
