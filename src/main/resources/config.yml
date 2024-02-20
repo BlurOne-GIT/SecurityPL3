@@ -2,6 +2,9 @@
 password_attempts: 3
 # Allow OPs to force other OPs to logout or change their password.
 op_vs_op: false
+# Ban duration in seconds, for when a player runs out of attempts.
+# Set to 0 for instant unban. Set to -1 to ban permanently.
+ban_duration: 300
 
 # Uncomment the following lines to enable a custom location to send the unauthenticated players to.
 # The default location is the spawn point.
