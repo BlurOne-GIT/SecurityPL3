@@ -8,7 +8,6 @@ import org.bukkit.command.CommandSender
 import org.bukkit.command.ConsoleCommandSender
 import org.bukkit.command.RemoteConsoleCommandSender
 import org.bukkit.command.TabExecutor
-import org.bukkit.entity.Player
 import org.bukkit.persistence.PersistentDataType
 
 class ForceLogoutExecutor(private val authorizedNamespacedKey: NamespacedKey, private val operatorVersus: Boolean) : TabExecutor {
@@ -42,6 +41,7 @@ class ForceLogoutExecutor(private val authorizedNamespacedKey: NamespacedKey, pr
 
         player.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, false)
         Bukkit.getServer().pluginManager.callEvent(PlayerUnauthorizedEvent(player))
+
         return true
     }
 
