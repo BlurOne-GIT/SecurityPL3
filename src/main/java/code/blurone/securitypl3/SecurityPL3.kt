@@ -1,28 +1,25 @@
 package code.blurone.securitypl3
 
-import code.blurone.securitypl3.commands.ForceLogoutExecutor
-import code.blurone.securitypl3.commands.LogoutExecutor
+import code.blurone.securitypl3.commands.*
 import code.blurone.securitypl3.events.PlayerUnauthorizedEvent
 import com.google.common.base.Charsets
 import com.google.common.hash.Hashing
+import org.bukkit.GameMode
 import org.bukkit.NamespacedKey
 import org.bukkit.boss.BarColor
 import org.bukkit.boss.BarFlag
 import org.bukkit.boss.BarStyle
 import org.bukkit.boss.BossBar
 import org.bukkit.entity.Player
-import org.bukkit.event.Cancellable
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.AsyncPlayerChatEvent
-import org.bukkit.event.player.PlayerEvent
 import org.bukkit.event.player.PlayerJoinEvent
-import org.bukkit.event.player.PlayerLoginEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
-import java.nio.charset.Charset
 import java.time.Duration
 
 class SecurityPL3 : JavaPlugin(), Listener {
@@ -32,6 +29,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private val authorizedNamespacedKey = NamespacedKey(this, "authorized")
     private val attemptsNamespacedKey = NamespacedKey(this, "attempts")
     private val lastPosNamespacedKey = NamespacedKey(this, "last_pos")
+    private val lastGameModeNamespacedKey = NamespacedKey(this, "last_gamemode")
     private val maxAttempts = config.getInt("password_attempts", 3).let { if (it < 1) 3 else it}
     private val attemptFactor = 1.0 / maxAttempts
     private val defaultLocation = config.getLocation("unauthorized_location")
@@ -45,7 +43,10 @@ class SecurityPL3 : JavaPlugin(), Listener {
             it.registerEvents(CancelEventsListener(authorizedNamespacedKey), this)
         }
         getCommand("logout")?.setExecutor(LogoutExecutor(authorizedNamespacedKey))
-        getCommand("forcelogout")?.setExecutor(ForceLogoutExecutor(authorizedNamespacedKey, config.getBoolean("op_vs_op", false)))
+        getCommand("changepassword")?.setExecutor(ChangePasswordExecutor(authorizedNamespacedKey, tempPasswordNamespacedKey))
+        val operaturVersus = config.getBoolean("op_vs_op", false)
+        getCommand("forcelogout")?.setExecutor(ForceLogoutExecutor(authorizedNamespacedKey, operaturVersus))
+        getCommand("forcechangepassword")?.setExecutor(ForceChangePasswordExecutor(authorizedNamespacedKey, passwordNamespacedKey, operaturVersus))
     }
 
     override fun onDisable() {
@@ -74,12 +75,22 @@ class SecurityPL3 : JavaPlugin(), Listener {
     }
 
     @EventHandler
+    private fun onPlayerQuit(event: PlayerQuitEvent)
+    {
+        event.player.persistentDataContainer.remove(tempPasswordNamespacedKey)
+    }
+
+    @EventHandler
     private fun unauthorizedHandler(event: PlayerUnauthorizedEvent)
     {
         if (!event.player.persistentDataContainer.has(lastPosNamespacedKey, LocationDataType()))
             event.player.persistentDataContainer.set(lastPosNamespacedKey, LocationDataType(), event.player.location)
 
+        if (!event.player.persistentDataContainer.has(lastGameModeNamespacedKey, PersistentDataType.STRING))
+            event.player.persistentDataContainer.set(lastGameModeNamespacedKey, PersistentDataType.STRING, event.player.gameMode.name)
+
         event.player.teleport(defaultLocation ?: server.worlds[0].spawnLocation)
+        event.player.gameMode = GameMode.SPECTATOR
 
         event.player.sendMessage("Please, enter ${
             if (event.player.persistentDataContainer.has(passwordNamespacedKey, PersistentDataType.LONG))
@@ -107,18 +118,29 @@ class SecurityPL3 : JavaPlugin(), Listener {
 
         val password = Hashing.sha256().hashString(event.message, Charsets.UTF_8).asLong()
         event.player.persistentDataContainer.get(passwordNamespacedKey, PersistentDataType.LONG)?.let {
-            if (password == it)
-                object : BukkitRunnable() {
-                    override fun run() {
-                        handleLogin(event.player)
-                    }
-                }.runTask(this)
-            else
+            if (password != it)
+            {
                 object : BukkitRunnable() {
                     override fun run() {
                         handleWrongAttempt(event.player)
                     }
                 }.runTask(this)
+                return
+            }
+
+            if (event.player.persistentDataContainer.has(tempPasswordNamespacedKey, PersistentDataType.LONG))
+                object : BukkitRunnable() {
+                    override fun run() {
+                        handleChangePassword(event.player)
+                    }
+                }.runTask(this)
+            else
+                object : BukkitRunnable() {
+                    override fun run() {
+                        handleLogin(event.player)
+                    }
+                }.runTask(this)
+
             return
         }
 
@@ -143,7 +165,6 @@ class SecurityPL3 : JavaPlugin(), Listener {
 
     private fun handleLogin(player: Player)
     {
-
         player.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, true)
         player.sendMessage("You are now authenticated.")
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
@@ -151,6 +172,17 @@ class SecurityPL3 : JavaPlugin(), Listener {
         server.removeBossBar(namespacedKey)
         player.teleport(player.persistentDataContainer.get(lastPosNamespacedKey, LocationDataType()) ?: defaultLocation ?: server.worlds[0].spawnLocation)
         player.persistentDataContainer.remove(lastPosNamespacedKey)
+        player.gameMode = player.persistentDataContainer.get(lastGameModeNamespacedKey, PersistentDataType.STRING)?.let{
+            try { GameMode.valueOf(it) } catch (e: IllegalArgumentException) { null }
+        } ?: server.defaultGameMode
+        player.persistentDataContainer.remove(lastGameModeNamespacedKey)
+    }
+
+    private fun handleChangePassword(player: Player)
+    {
+        player.persistentDataContainer.remove(tempPasswordNamespacedKey)
+        player.persistentDataContainer.remove(passwordNamespacedKey)
+        server.pluginManager.callEvent(PlayerUnauthorizedEvent(player))
     }
 
     private fun handleWrongAttempt(player: Player)
