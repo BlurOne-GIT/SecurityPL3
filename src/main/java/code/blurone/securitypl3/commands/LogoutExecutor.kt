@@ -1,6 +1,9 @@
 package code.blurone.securitypl3.commands
 
+import code.blurone.securitypl3.SecurityPL3
 import code.blurone.securitypl3.events.PlayerUnauthorizedEvent
+import net.md_5.bungee.api.ChatColor
+import net.md_5.bungee.api.chat.ComponentBuilder
 import org.bukkit.Bukkit
 import org.bukkit.NamespacedKey
 import org.bukkit.command.Command
@@ -22,6 +25,12 @@ class LogoutExecutor(private val authorizedNamespacedKey: NamespacedKey) : TabEx
             return true
         }
 
+        sender.spigot().sendMessage(
+            *ComponentBuilder("\uD83D\uDD12").color(ChatColor.GREEN)
+                .append(" » ").color(ChatColor.GRAY)
+                .append(SecurityPL3.getTranslation("successful_logout", sender.locale)).reset()
+                .create()
+        )
         sender.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, false)
         Bukkit.getServer().pluginManager.callEvent(PlayerUnauthorizedEvent(sender))
         return true
