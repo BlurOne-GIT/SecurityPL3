@@ -4,12 +4,15 @@ import code.blurone.securitypl3.commands.*
 import code.blurone.securitypl3.events.PlayerUnauthorizedEvent
 import com.google.common.base.Charsets
 import com.google.common.hash.Hashing
+import net.md_5.bungee.api.chat.ComponentBuilder
+import net.md_5.bungee.api.ChatColor
 import org.bukkit.GameMode
 import org.bukkit.NamespacedKey
 import org.bukkit.boss.BarColor
 import org.bukkit.boss.BarFlag
 import org.bukkit.boss.BarStyle
 import org.bukkit.boss.BossBar
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -17,9 +20,11 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.server.BroadcastMessageEvent
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
+import java.io.File
 import java.time.Duration
 
 class SecurityPL3 : JavaPlugin(), Listener {
@@ -38,6 +43,23 @@ class SecurityPL3 : JavaPlugin(), Listener {
     override fun onEnable() {
         // Plugin startup logic
         saveDefaultConfig()
+        saveResource("translations/default.yml", true)
+        supportedTranslations.forEach {
+            if (!File(dataFolder, "translations/$it.yml").exists())
+                saveResource("translations/$it.yml", false)
+        }
+        for (file in dataFolder.resolve("translations").listFiles()!!) {
+            if (file.extension != "yml") continue
+
+            translations[file.nameWithoutExtension.lowercase()] = try {
+                val yaml = YamlConfiguration()
+                yaml.load(file)
+                yaml
+            } catch (e: Exception) {
+                logger.warning("Failed to load ${file.name}.")
+                continue
+            }
+        }
         server.pluginManager.let {
             it.registerEvents(this, this)
             it.registerEvents(CancelEventsListener(authorizedNamespacedKey), this)
@@ -53,15 +75,16 @@ class SecurityPL3 : JavaPlugin(), Listener {
         // Plugin shutdown logic
     }
 
+    // 🔒 🔓 🔑 👤 » 🔐
+
     @EventHandler
     private fun onPlayerJoin(event: PlayerJoinEvent)
     {
         val savedAddress = event.player.persistentDataContainer.get(addressNamespacedKey, PersistentDataType.LONG)
         val hashedAddress = Hashing.sha256().hashBytes(event.player.address!!.address.address).asLong()
-        if (savedAddress == null)
-            event.player.persistentDataContainer.set(addressNamespacedKey, PersistentDataType.LONG, hashedAddress)
-        else if (savedAddress != hashedAddress)
+        if (savedAddress != hashedAddress)
             event.player.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, false)
+        event.player.persistentDataContainer.set(addressNamespacedKey, PersistentDataType.LONG, hashedAddress)
 
         // pre authorization checkpoint
         if (!event.player.persistentDataContainer.has(authorizedNamespacedKey, PersistentDataType.BOOLEAN) || !event.player.persistentDataContainer.has(passwordNamespacedKey, PersistentDataType.LONG))
@@ -92,18 +115,26 @@ class SecurityPL3 : JavaPlugin(), Listener {
         event.player.teleport(defaultLocation ?: server.worlds[0].spawnLocation)
         event.player.gameMode = GameMode.SPECTATOR
 
-        event.player.sendMessage("Please, enter ${
-            if (event.player.persistentDataContainer.has(passwordNamespacedKey, PersistentDataType.LONG))
-                "your"
-            else
-                "a new"
-        } password.")
+        val hasPassword = event.player.persistentDataContainer.has(passwordNamespacedKey, PersistentDataType.LONG)
 
-        if (!event.player.persistentDataContainer.has(passwordNamespacedKey, PersistentDataType.LONG))
+        event.player.spigot().sendMessage(
+            *ComponentBuilder(if (hasPassword) "\uD83D\uDD12" else "\uD83D\uDD11").color(ChatColor.RED)
+                .append(" » ").color(ChatColor.GRAY)
+                .append(getTranslation(if (hasPassword) "request_password" else "request_new_password", event.player.locale)).reset()
+                .create()
+        )
+
+        if (!hasPassword)
             return
 
         createBossBar(event.player)
         event.player.persistentDataContainer.set(attemptsNamespacedKey, PersistentDataType.INTEGER, maxAttempts)
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    private fun onBroadcastMessageEvent(event: BroadcastMessageEvent)
+    {
+        event.recipients.removeIf { it is Player && it.persistentDataContainer.get(authorizedNamespacedKey, PersistentDataType.BOOLEAN) != true }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -137,7 +168,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
             else
                 object : BukkitRunnable() {
                     override fun run() {
-                        handleLogin(event.player)
+                        handleLogin(event.player, "\uD83D\uDD13")
                     }
                 }.runTask(this)
 
@@ -146,27 +177,42 @@ class SecurityPL3 : JavaPlugin(), Listener {
 
         val tempPassword = event.player.persistentDataContainer.get(tempPasswordNamespacedKey, PersistentDataType.LONG)
             ?: run {
-                event.player.sendMessage("Repeat the password.")
+                event.player.spigot().sendMessage(
+                    *ComponentBuilder("\uD83D\uDD11").color(ChatColor.GOLD)
+                        .append(" » ").color(ChatColor.GRAY)
+                        .append(getTranslation("repeat_password", event.player.locale)).reset()
+                        .create()
+                )
                 return event.player.persistentDataContainer.set(tempPasswordNamespacedKey, PersistentDataType.LONG, password)
             }
 
         event.player.persistentDataContainer.remove(tempPasswordNamespacedKey)
 
         if (password != tempPassword)
-            return event.player.sendMessage("Passwords do not match.")
+            return event.player.spigot().sendMessage(
+                *ComponentBuilder("\uD83D\uDD11").color(ChatColor.RED)
+                    .append(" » ").color(ChatColor.GRAY)
+                    .append(getTranslation("passwords_dont_match", event.player.locale)).reset()
+                    .create()
+            )
 
         event.player.persistentDataContainer.set(passwordNamespacedKey, PersistentDataType.LONG, password)
         object : BukkitRunnable() {
             override fun run() {
-                handleLogin(event.player)
+                handleLogin(event.player, "\uD83D\uDD11")
             }
         }.runTask(this)
     }
 
-    private fun handleLogin(player: Player)
+    private fun handleLogin(player: Player, icon: String)
     {
         player.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, true)
-        player.sendMessage("You are now authenticated.")
+        player.spigot().sendMessage(
+            *ComponentBuilder(icon).color(ChatColor.GREEN)
+                .append(" » ").color(ChatColor.GRAY)
+                .append(getTranslation("authenticated", player.locale)).reset()
+                .create()
+        )
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
         server.getBossBar(namespacedKey)?.removeAll()
         server.removeBossBar(namespacedKey)
@@ -187,7 +233,12 @@ class SecurityPL3 : JavaPlugin(), Listener {
 
     private fun handleWrongAttempt(player: Player)
     {
-        player.sendMessage("Wrong password.")
+        player.spigot().sendMessage(
+            *ComponentBuilder("\uD83D\uDD12").color(ChatColor.RED)
+                .append(" » ").color(ChatColor.GRAY)
+                .append(getTranslation("wrong_password", player.locale)).reset()
+                .create()
+        )
         var attempts = player.persistentDataContainer.get(attemptsNamespacedKey, PersistentDataType.INTEGER)!!
         player.persistentDataContainer.set(attemptsNamespacedKey, PersistentDataType.INTEGER, --attempts)
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
@@ -199,16 +250,30 @@ class SecurityPL3 : JavaPlugin(), Listener {
 
         bossBar.removeAll()
         server.removeBossBar(namespacedKey)
-        player.banIp("Too many wrong attempts.", banDuration, null, true)
+        player.banIp(getTranslation("too_many_attempts", player.locale), banDuration, null, true)
     }
 
     private fun createBossBar(player: Player): BossBar
     {
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
         val bossBar = server.getBossBar(namespacedKey) ?:
-            server.createBossBar(namespacedKey, "Attempts", BarColor.RED, BarStyle.SOLID, BarFlag.CREATE_FOG, BarFlag.DARKEN_SKY)
+            server.createBossBar(namespacedKey, getTranslation("attempts", player.locale), BarColor.RED, BarStyle.SOLID, BarFlag.CREATE_FOG, BarFlag.DARKEN_SKY)
         bossBar.addPlayer(player)
         bossBar.progress = 1.0
         return bossBar
+    }
+
+    companion object
+    {
+        private val supportedTranslations = listOf("en", "es")
+        private val translations = mutableMapOf<String, YamlConfiguration>()
+
+        fun getTranslation(key: String, locale: String): String
+        {
+            return translations[locale.lowercase()]?.getString(key) ?:
+            translations[locale.split('_')[0].lowercase()]?.getString(key) ?:
+            translations["default"]?.getString(key) ?:
+            key
+        }
     }
 }
