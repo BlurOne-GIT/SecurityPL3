@@ -168,7 +168,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
         player.persistentDataContainer.set(authorizedNamespacedKey, PersistentDataType.BOOLEAN, true)
         player.sendMessage("You are now authenticated.")
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
-        server.getBossBar(namespacedKey)!!.removeAll()
+        server.getBossBar(namespacedKey)?.removeAll()
         server.removeBossBar(namespacedKey)
         player.teleport(player.persistentDataContainer.get(lastPosNamespacedKey, LocationDataType()) ?: defaultLocation ?: server.worlds[0].spawnLocation)
         player.persistentDataContainer.remove(lastPosNamespacedKey)
