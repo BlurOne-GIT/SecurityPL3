@@ -5,7 +5,6 @@ import org.bukkit.event.Cancellable
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryOpenEvent
 import org.bukkit.event.player.*
 import org.bukkit.persistence.PersistentDataType
 
@@ -187,15 +186,5 @@ class CancelEventsListener(private val authorizedNamespacedKey: NamespacedKey) :
     // PlayerUnregisterChannelEvent (non Cancellable/not needed)
 
     // PlayerVelocityEvent (not needed)
-
-    // org.bukkit.event.inventory package
-
-    // Ignore all because not needed
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    private fun onInventoryOpenEvent(event: InventoryOpenEvent) {
-        if (event.player.persistentDataContainer.get(authorizedNamespacedKey, PersistentDataType.BOOLEAN) != true)
-            event.isCancelled = true
-    }
 
 }
