@@ -24,6 +24,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.server.BroadcastMessageEvent
+import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
@@ -43,6 +44,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private val defaultLocation = config.getLocation("unauthorized_location")
     private val banDuration = config.getLong("ban_duration", 300).let { if (it < 0) null else Duration.ofSeconds(it) }
     private val useTheChatTitle = config.getBoolean("use_the_chat_title", true)
+    private val unauthorizedInventories = mutableMapOf<String, Array<ItemStack>>()
 
     override fun onEnable() {
         // Plugin startup logic
@@ -105,6 +107,9 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private fun onPlayerQuit(event: PlayerQuitEvent)
     {
         event.player.persistentDataContainer.remove(tempPasswordNamespacedKey)
+        unauthorizedInventories.remove(event.player.name)?.let {
+            event.player.inventory.contents = it
+        }
     }
 
     @EventHandler
@@ -127,6 +132,9 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .append(getTranslation(if (hasPassword) "request_password" else "request_new_password", event.player.locale)).reset()
                 .create()
         )
+
+        unauthorizedInventories[event.player.name] = event.player.inventory.contents
+        event.player.inventory.clear()
 
         if (useTheChatTitle)
             event.player.sendTitle("", getTranslation("use_the_chat", event.player.locale), 10, 12000, 10)
@@ -220,6 +228,9 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .append(getTranslation("authenticated", player.locale)).reset()
                 .create()
         )
+        unauthorizedInventories.remove(player.name)?.let {
+            player.inventory.contents = it
+        }
         if (useTheChatTitle)
             player.resetTitle()
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
