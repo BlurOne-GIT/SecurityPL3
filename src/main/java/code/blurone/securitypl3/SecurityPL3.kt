@@ -42,6 +42,7 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private val attemptFactor = 1.0 / maxAttempts
     private val defaultLocation = config.getLocation("unauthorized_location")
     private val banDuration = config.getLong("ban_duration", 300).let { if (it < 0) null else Duration.ofSeconds(it) }
+    private val useTheChatTitle = config.getBoolean("use_the_chat_title", true)
 
     override fun onEnable() {
         // Plugin startup logic
@@ -126,6 +127,9 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .append(getTranslation(if (hasPassword) "request_password" else "request_new_password", event.player.locale)).reset()
                 .create()
         )
+
+        if (useTheChatTitle)
+            event.player.sendTitle("", getTranslation("use_the_chat", event.player.locale), 10, 12000, 10)
 
         if (!hasPassword)
             return
@@ -216,6 +220,8 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .append(getTranslation("authenticated", player.locale)).reset()
                 .create()
         )
+        if (useTheChatTitle)
+            player.resetTitle()
         val namespacedKey = NamespacedKey(this, "attempts_for_${player.name}")
         server.getBossBar(namespacedKey)?.removeAll()
         server.removeBossBar(namespacedKey)
