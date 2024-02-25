@@ -1,3 +1,5 @@
+# Show a title to the player to indicate that they need to use the chat to authenticate.
+use_the_chat_title: true
 # Amount of attempts to login with the wrong password before the player is kicked.
 password_attempts: 3
 # Allow OPs to force other OPs to logout or change their password.
