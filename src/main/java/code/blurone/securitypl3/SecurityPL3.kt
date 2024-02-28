@@ -24,7 +24,6 @@ import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.server.BroadcastMessageEvent
-import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
@@ -38,13 +37,13 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private val authorizedNamespacedKey = NamespacedKey(this, "authorized")
     private val attemptsNamespacedKey = NamespacedKey(this, "attempts")
     private val lastPosNamespacedKey = NamespacedKey(this, "last_pos")
+    private val inventoryNamespacedKey = NamespacedKey(this, "inventory")
     private val lastGameModeNamespacedKey = NamespacedKey(this, "last_gamemode")
     private val maxAttempts = config.getInt("password_attempts", 3).let { if (it < 1) 3 else it}
     private val attemptFactor = 1.0 / maxAttempts
     private val defaultLocation = config.getLocation("unauthorized_location")
     private val banDuration = config.getLong("ban_duration", 300).let { if (it < 0) null else Duration.ofSeconds(it) }
     private val useTheChatTitle = config.getBoolean("use_the_chat_title", true)
-    private val unauthorizedInventories = mutableMapOf<String, Array<ItemStack>>()
 
     override fun onEnable() {
         // Plugin startup logic
@@ -107,9 +106,6 @@ class SecurityPL3 : JavaPlugin(), Listener {
     private fun onPlayerQuit(event: PlayerQuitEvent)
     {
         event.player.persistentDataContainer.remove(tempPasswordNamespacedKey)
-        unauthorizedInventories.remove(event.player.name)?.let {
-            event.player.inventory.contents = it
-        }
     }
 
     @EventHandler
@@ -133,7 +129,8 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .create()
         )
 
-        unauthorizedInventories[event.player.name] = event.player.inventory.contents
+        if (!event.player.persistentDataContainer.has(inventoryNamespacedKey, PersistentDataType.STRING))
+            event.player.persistentDataContainer.set(inventoryNamespacedKey, PersistentDataType.STRING, InventoryToBase64.toBase64(event.player.inventory))
         event.player.inventory.clear()
 
         if (useTheChatTitle)
@@ -228,8 +225,9 @@ class SecurityPL3 : JavaPlugin(), Listener {
                 .append(getTranslation("authenticated", player.locale)).reset()
                 .create()
         )
-        unauthorizedInventories.remove(player.name)?.let {
-            player.inventory.contents = it
+        player.persistentDataContainer.get(inventoryNamespacedKey, PersistentDataType.STRING)?.let {
+            player.inventory.contents = InventoryToBase64.fromBase64(it)
+            player.persistentDataContainer.remove(inventoryNamespacedKey)
         }
         if (useTheChatTitle)
             player.resetTitle()
