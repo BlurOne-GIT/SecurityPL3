@@ -4,7 +4,7 @@
   <groupId>code.blurone</groupId>
   <artifactId>SecurityPL3</artifactId>
   <name>SecurityPL3</name>
-  <version>3.0.0-SNAPSHOT</version>
+  <version>3.0.1</version>
   <build>
     <resources>
       <resource>

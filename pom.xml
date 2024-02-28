@@ -6,7 +6,7 @@
 
   <groupId>code.blurone</groupId>
   <artifactId>SecurityPL3</artifactId>
-  <version>3.0.0</version>
+  <version>3.0.1</version>
   <packaging>jar</packaging>
 
   <name>SecurityPL3</name>
